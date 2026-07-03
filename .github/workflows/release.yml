@@ -1,0 +1,232 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: droid-dev-helper-linux
+          - os: macos-latest
+            artifact_name: droid-dev-helper-macos
+          - os: windows-latest
+            artifact_name: droid-dev-helper-windows
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install System Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pyqt5-dev-tools python3-pyqt5 libegl1-mesa-dev
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PyQt5
+
+      - name: Build Executable with PyInstaller (Windows/Linux)
+        if: matrix.os != 'macos-latest'
+        run: |
+          pyinstaller --onefile --noconsole --name="droid-dev-helper" app.py
+
+      - name: Build Executable with PyInstaller (macOS App Bundle)
+        if: matrix.os == 'macos-latest'
+        run: |
+          pyinstaller --onedir --noconsole --name="droid-dev-helper" app.py
+
+      # --- Linux Specific Packaging (.deb, .AppImage, .tar.gz) ---
+      - name: Package Linux Assets
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # 1. Create Tarball (.tar.gz)
+          cd dist
+          tar -czvf droid-dev-helper_linux_amd64.tar.gz droid-dev-helper
+          cd ..
+
+          # 2. Build Debian Package (.deb)
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/usr/bin
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/usr/share/pixmaps
+
+          # Get version from Git tag
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Write Control File
+          cat <<EOF > deb/DEBIAN/control
+          Package: droid-dev-helper
+          Version: ${TAG_VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Hyeonseok0830 <hyeonseok0830@github.com>
+          Description: Android Developer Helper GUI using adb and scrcpy.
+          EOF
+
+          # Copy executable & icon
+          cp dist/droid-dev-helper deb/usr/bin/droid-dev-helper
+          if [ -f dev_companion_icon.jpg ]; then
+            cp dev_companion_icon.jpg deb/usr/share/pixmaps/droid-dev-helper.jpg
+          fi
+
+          # Create Desktop Entry
+          cat <<EOF > deb/usr/share/applications/droid-dev-helper.desktop
+          [Desktop Entry]
+          Name=Droid Dev Helper
+          Comment=Android Dev Helper GUI Tool
+          Exec=/usr/bin/droid-dev-helper
+          Icon=/usr/share/pixmaps/droid-dev-helper.jpg
+          Terminal=false
+          Type=Application
+          Categories=Development;Utility;
+          EOF
+
+          # Build deb
+          dpkg-deb --build deb dist/droid-dev-helper_${TAG_VERSION}_amd64.deb
+
+          # 3. Build AppImage (using linuxdeploy)
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          
+          # Set up AppDir structure
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
+          
+          cp dist/droid-dev-helper AppDir/usr/bin/
+          cp deb/usr/share/applications/droid-dev-helper.desktop AppDir/usr/share/applications/
+          if [ -f dev_companion_icon.jpg ]; then
+            cp dev_companion_icon.jpg AppDir/usr/share/icons/hicolor/512x512/apps/droid-dev-helper.jpg
+          fi
+          
+          # Run linuxdeploy to generate AppImage
+          # Disable check inside container since Actions environment doesn't support FUSE out of the box
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+          mv Droid_Dev_Helper*.AppImage dist/Droid-Dev-Helper_${TAG_VERSION}_amd64.AppImage
+
+      # --- macOS Specific Packaging (.dmg) ---
+      - name: Package macOS Assets
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install create-dmg
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          
+          cd dist
+          # Compress app bundle as zip
+          zip -r droid-dev-helper_mac_universal.zip droid-dev-helper.app
+          
+          # Build DMG
+          create-dmg \
+            --volname "Droid Dev Helper" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "droid-dev-helper.app" 175 120 \
+            --app-drop-link 425 120 \
+            "droid-dev-helper-${TAG_VERSION}-universal.dmg" \
+            "droid-dev-helper.app"
+
+      # --- Windows Specific Packaging (Setup.exe) ---
+      - name: Package Windows Assets
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Generate Inno Setup file (.iss) dynamically
+          cat <<EOF > setup.iss
+          [Setup]
+          AppName=Droid Dev Helper
+          AppVersion=${TAG_VERSION}
+          DefaultDirName={autopf}\Droid Dev Helper
+          DefaultGroupName=Droid Dev Helper
+          UninstallDisplayIcon={app}\droid-dev-helper.exe
+          OutputDir=dist
+          OutputBaseFilename=Droid_Dev_Helper_Setup_${TAG_VERSION}
+          Compression=lzma
+          SolidCompression=yes
+          WizardStyle=modern
+
+          [Files]
+          Source: "dist\droid-dev-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{group}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"
+          Name: "{autodesktop}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+          EOF
+          
+          # Run Inno Setup Compiler (iscc is pre-installed on Windows runner)
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      # --- Upload Intermediate Artifacts for Release Job ---
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten Artifacts Structure
+        run: |
+          mkdir -p release_assets
+          find artifacts -type f -exec cp {} release_assets/ \;
+          ls -R release_assets/
+
+      - name: Calculate SHA-256 Checksums
+        run: |
+          cd release_assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
