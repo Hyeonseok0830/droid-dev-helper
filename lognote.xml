@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<entry key="TOKEN_CHECK_2">false</entry>
+<entry key="TOKEN_CHECK_1">false</entry>
+<entry key="HIGHLIGHT_LOG_CHECK">false</entry>
+<entry key="CONFIG_VERSION">4</entry>
+<entry key="TOKEN_CHECK_0">false</entry>
+<entry key="LOG_LEVEL">1</entry>
+<entry key="SHOW_LOG_CHECK">true</entry>
+</properties>
