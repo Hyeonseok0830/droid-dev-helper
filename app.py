@@ -13,8 +13,37 @@ from PyQt5.QtWidgets import (
     QMenu
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QAbstractTableModel, QModelIndex
-from PyQt5.QtGui import QTextCursor, QBrush, QColor, QFont
+from PyQt5.QtGui import QTextCursor, QBrush, QColor, QFont, QIcon
 
+
+import traceback
+
+def resource_path(relative_path):
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+def exception_hook(exctype, value, tb):
+    tb_lines = traceback.format_exception(exctype, value, tb)
+    error_msg = "".join(tb_lines)
+    try:
+        with open("crash_report.txt", "w", encoding="utf-8") as f:
+            f.write(error_msg)
+    except Exception:
+        pass
+    try:
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
+        QMessageBox.critical(None, "오류 발생 (Crash Report)", f"애플리케이션 실행 중 오류가 발생했습니다.\n\n{error_msg}")
+    except Exception:
+        pass
+    sys.exit(1)
+
+sys.excepthook = exception_hook
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
 
@@ -618,9 +647,14 @@ class MainWindow(QMainWindow):
         self.connected_serials = set()
         self.active_tasks = []
         
-        self.setWindowTitle('Android Dev Companion v2.0')
+        self.setWindowTitle('Droid Dev Helper')
         self.resize(1150, 800)
         self.setAcceptDrops(True)
+        
+        # Set Window Icon
+        icon_path = resource_path('droid-dev-helper.png')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         self.setup_ui()
         self.apply_dark_style()
@@ -655,7 +689,7 @@ class MainWindow(QMainWindow):
         
         # Logo Section with Settings Button
         logo_layout = QHBoxLayout()
-        logo_label = QLabel('Android Dev Companion')
+        logo_label = QLabel('Droid Dev Helper')
         logo_label.setObjectName('logo')
         
         btn_settings = QPushButton('설정 ⚙')
