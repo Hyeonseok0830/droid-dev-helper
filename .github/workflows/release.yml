@@ -73,14 +73,14 @@ jobs:
 
           # Write Control File
           cat <<EOF > deb/DEBIAN/control
-          Package: droid-dev-helper
-          Version: ${TAG_VERSION}
-          Section: utils
-          Priority: optional
-          Architecture: amd64
-          Maintainer: Hyeonseok0830 <hyeonseok0830@github.com>
-          Description: Android Developer Helper GUI using adb and scrcpy.
-          EOF
+Package: droid-dev-helper
+Version: ${TAG_VERSION}
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Hyeonseok0830 <hyeonseok0830@github.com>
+Description: Android Developer Helper GUI using adb and scrcpy.
+EOF
 
           # Copy executable & icon
           cp dist/droid-dev-helper deb/usr/bin/droid-dev-helper
@@ -90,15 +90,15 @@ jobs:
 
           # Create Desktop Entry
           cat <<EOF > deb/usr/share/applications/droid-dev-helper.desktop
-          [Desktop Entry]
-          Name=Droid Dev Helper
-          Comment=Android Dev Helper GUI Tool
-          Exec=/usr/bin/droid-dev-helper
-          Icon=/usr/share/pixmaps/droid-dev-helper.jpg
-          Terminal=false
-          Type=Application
-          Categories=Development;Utility;
-          EOF
+[Desktop Entry]
+Name=Droid Dev Helper
+Comment=Android Dev Helper GUI Tool
+Exec=/usr/bin/droid-dev-helper
+Icon=/usr/share/pixmaps/droid-dev-helper.jpg
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+EOF
 
           # Build deb
           dpkg-deb --build deb dist/droid-dev-helper_${TAG_VERSION}_amd64.deb
@@ -155,28 +155,28 @@ jobs:
           
           # Generate Inno Setup file (.iss) dynamically
           cat <<EOF > setup.iss
-          [Setup]
-          AppName=Droid Dev Helper
-          AppVersion=${TAG_VERSION}
-          DefaultDirName={autopf}\Droid Dev Helper
-          DefaultGroupName=Droid Dev Helper
-          UninstallDisplayIcon={app}\droid-dev-helper.exe
-          OutputDir=dist
-          OutputBaseFilename=Droid_Dev_Helper_Setup_${TAG_VERSION}
-          Compression=lzma
-          SolidCompression=yes
-          WizardStyle=modern
+[Setup]
+AppName=Droid Dev Helper
+AppVersion=${TAG_VERSION}
+DefaultDirName={autopf}\Droid Dev Helper
+DefaultGroupName=Droid Dev Helper
+UninstallDisplayIcon={app}\droid-dev-helper.exe
+OutputDir=dist
+OutputBaseFilename=Droid_Dev_Helper_Setup_${TAG_VERSION}
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
 
-          [Files]
-          Source: "dist\droid-dev-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
+[Files]
+Source: "dist\droid-dev-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 
-          [Icons]
-          Name: "{group}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"
-          Name: "{autodesktop}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"; Tasks: desktopicon
+[Icons]
+Name: "{group}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"
+Name: "{autodesktop}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"; Tasks: desktopicon
 
-          [Tasks]
-          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-          EOF
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+EOF
           
           # Run Inno Setup Compiler (iscc is pre-installed on Windows runner)
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
