@@ -82,15 +82,15 @@ jobs:
 
           # Copy executable & icon
           cp dist/droid-dev-helper deb/usr/bin/droid-dev-helper
-          if [ -f dev_companion_icon.jpg ]; then
-            cp dev_companion_icon.jpg deb/usr/share/pixmaps/droid-dev-helper.jpg
+          if [ -f droid-dev-helper.png ]; then
+            cp droid-dev-helper.png deb/usr/share/pixmaps/droid-dev-helper.png
           fi
 
           # Create Desktop Entry
           echo "[Desktop Entry]" > deb/usr/share/applications/droid-dev-helper.desktop
           echo "Name=Droid Dev Helper" >> deb/usr/share/applications/droid-dev-helper.desktop
           echo "Comment=Android Dev Helper GUI Tool" >> deb/usr/share/applications/droid-dev-helper.desktop
-          echo "Exec=/usr/bin/droid-dev-helper" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Exec=droid-dev-helper" >> deb/usr/share/applications/droid-dev-helper.desktop
           echo "Icon=droid-dev-helper" >> deb/usr/share/applications/droid-dev-helper.desktop
           echo "Terminal=false" >> deb/usr/share/applications/droid-dev-helper.desktop
           echo "Type=Application" >> deb/usr/share/applications/droid-dev-helper.desktop
@@ -114,8 +114,8 @@ jobs:
           # Disable check inside container since Actions environment doesn't support FUSE out of the box
           export APPIMAGE_EXTRACT_AND_RUN=1
           
-          if [ -f dev_companion_icon.jpg ]; then
-            ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --icon-file=dev_companion_icon.jpg
+          if [ -f droid-dev-helper.png ]; then
+            ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --icon-file=droid-dev-helper.png
           else
             ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
           fi
