@@ -72,15 +72,13 @@ jobs:
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
 
           # Write Control File
-          cat <<EOF > deb/DEBIAN/control
-Package: droid-dev-helper
-Version: ${TAG_VERSION}
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: Hyeonseok0830 <hyeonseok0830@github.com>
-Description: Android Developer Helper GUI using adb and scrcpy.
-EOF
+          echo "Package: droid-dev-helper" > deb/DEBIAN/control
+          echo "Version: ${TAG_VERSION}" >> deb/DEBIAN/control
+          echo "Section: utils" >> deb/DEBIAN/control
+          echo "Priority: optional" >> deb/DEBIAN/control
+          echo "Architecture: amd64" >> deb/DEBIAN/control
+          echo "Maintainer: Hyeonseok0830 <hyeonseok0830@github.com>" >> deb/DEBIAN/control
+          echo "Description: Android Developer Helper GUI using adb and scrcpy." >> deb/DEBIAN/control
 
           # Copy executable & icon
           cp dist/droid-dev-helper deb/usr/bin/droid-dev-helper
@@ -89,16 +87,14 @@ EOF
           fi
 
           # Create Desktop Entry
-          cat <<EOF > deb/usr/share/applications/droid-dev-helper.desktop
-[Desktop Entry]
-Name=Droid Dev Helper
-Comment=Android Dev Helper GUI Tool
-Exec=/usr/bin/droid-dev-helper
-Icon=/usr/share/pixmaps/droid-dev-helper.jpg
-Terminal=false
-Type=Application
-Categories=Development;Utility;
-EOF
+          echo "[Desktop Entry]" > deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Name=Droid Dev Helper" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Comment=Android Dev Helper GUI Tool" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Exec=/usr/bin/droid-dev-helper" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Icon=/usr/share/pixmaps/droid-dev-helper.jpg" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Terminal=false" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Type=Application" >> deb/usr/share/applications/droid-dev-helper.desktop
+          echo "Categories=Development;Utility;" >> deb/usr/share/applications/droid-dev-helper.desktop
 
           # Build deb
           dpkg-deb --build deb dist/droid-dev-helper_${TAG_VERSION}_amd64.deb
@@ -154,29 +150,27 @@ EOF
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
           
           # Generate Inno Setup file (.iss) dynamically
-          cat <<EOF > setup.iss
-[Setup]
-AppName=Droid Dev Helper
-AppVersion=${TAG_VERSION}
-DefaultDirName={autopf}\Droid Dev Helper
-DefaultGroupName=Droid Dev Helper
-UninstallDisplayIcon={app}\droid-dev-helper.exe
-OutputDir=dist
-OutputBaseFilename=Droid_Dev_Helper_Setup_${TAG_VERSION}
-Compression=lzma
-SolidCompression=yes
-WizardStyle=modern
-
-[Files]
-Source: "dist\droid-dev-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
-
-[Icons]
-Name: "{group}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"
-Name: "{autodesktop}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"; Tasks: desktopicon
-
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-EOF
+          echo "[Setup]" > setup.iss
+          echo "AppName=Droid Dev Helper" >> setup.iss
+          echo "AppVersion=${TAG_VERSION}" >> setup.iss
+          echo "DefaultDirName={autopf}\Droid Dev Helper" >> setup.iss
+          echo "DefaultGroupName=Droid Dev Helper" >> setup.iss
+          echo "UninstallDisplayIcon={app}\droid-dev-helper.exe" >> setup.iss
+          echo "OutputDir=dist" >> setup.iss
+          echo "OutputBaseFilename=Droid_Dev_Helper_Setup_${TAG_VERSION}" >> setup.iss
+          echo "Compression=lzma" >> setup.iss
+          echo "SolidCompression=yes" >> setup.iss
+          echo "WizardStyle=modern" >> setup.iss
+          echo "" >> setup.iss
+          echo "[Files]" >> setup.iss
+          echo 'Source: "dist\droid-dev-helper.exe"; DestDir: "{app}"; Flags: ignoreversion' >> setup.iss
+          echo "" >> setup.iss
+          echo "[Icons]" >> setup.iss
+          echo 'Name: "{group}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"' >> setup.iss
+          echo 'Name: "{autodesktop}\Droid Dev Helper"; Filename: "{app}\droid-dev-helper.exe"; Tasks: desktopicon' >> setup.iss
+          echo "" >> setup.iss
+          echo "[Tasks]" >> setup.iss
+          echo 'Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked' >> setup.iss
           
           # Run Inno Setup Compiler (iscc is pre-installed on Windows runner)
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
