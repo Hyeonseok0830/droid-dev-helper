@@ -25,7 +25,5 @@ parts:
     source: dist/
     organize:
       droid-dev-helper: usr/bin/droid-dev-helper
-    stage-packages:
-      - libx11-6
-      - libgl1
-      - libegl1
+      usr/share/applications/droid-dev-helper.desktop: usr/share/applications/droid-dev-helper.desktop
+      usr/share/pixmaps/droid-helper.png: usr/share/pixmaps/droid-helper.png

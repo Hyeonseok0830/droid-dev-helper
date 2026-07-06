@@ -130,6 +130,26 @@ jobs:
           mv Droid_Dev_Helper*.AppImage dist/Droid-Dev-Helper_${TAG_VERSION}_amd64.AppImage
 
       # --- Build Snap Package for Ubuntu App Center ---
+      - name: Prepare Snap Assets
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p dist/usr/share/applications
+          mkdir -p dist/usr/share/pixmaps
+          
+          # Create desktop file inside dist source layout
+          echo "[Desktop Entry]" > dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Name=Droid Helper" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Comment=Android Dev Helper GUI Tool" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Exec=droid-helper" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Icon=droid-helper" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Terminal=false" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Type=Application" >> dist/usr/share/applications/droid-dev-helper.desktop
+          echo "Categories=Development;Utility;" >> dist/usr/share/applications/droid-dev-helper.desktop
+          
+          if [ -f droid-dev-helper.png ]; then
+            cp droid-dev-helper.png dist/usr/share/pixmaps/droid-helper.png
+          fi
+          
       - name: Build Snap Package
         if: matrix.os == 'ubuntu-latest'
         uses: snapcore/action-build@v1
