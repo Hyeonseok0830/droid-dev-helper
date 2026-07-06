@@ -1963,6 +1963,11 @@ class MainWindow(QMainWindow):
         """)
 
     def closeEvent(self, event):
+        # Stop background device detection thread
+        if hasattr(self, 'device_detect_thread') and self.device_detect_thread:
+            self.device_detect_thread.stop()
+            self.device_detect_thread.wait()
+
         self.stop_logcat_stream()
         self.stop_mirroring()
         
