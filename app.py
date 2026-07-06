@@ -1002,7 +1002,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            res = subprocess.run([self.adb_path, 'devices', '-l'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.0)
+            res = subprocess.run([self.adb_path, 'devices', '-l'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5.0)
             lines = res.stdout.strip().split('\n')[1:]
             
             current_devices = {}
@@ -1051,6 +1051,12 @@ class MainWindow(QMainWindow):
                 self.enable_controls(False)
                 self.stop_logcat_stream()
                 
+        except subprocess.TimeoutExpired:
+            self.status_label.setText('연결 대기 중 (시간 초과)')
+            self.status_label.setStyleSheet('color: #ff9f0a; background: rgba(255, 159, 10, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
+            self.statusBar().showMessage("디바이스 연결 응답 시간 초과 (5초)", 3000)
+            self.enable_controls(False)
+            self.stop_logcat_stream()
         except Exception as e:
             self.status_label.setText('오류 발생')
             self.statusBar().showMessage(f"디바이스 상태 확인 오류: {str(e)}", 3000)
