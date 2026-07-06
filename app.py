@@ -370,6 +370,8 @@ class SettingsDialog(QDialog):
         self.adb_edit = QLineEdit(self.config.get('adb_path', ''))
         btn_browse_adb = QPushButton("찾기")
         btn_browse_adb.setMinimumHeight(32)
+        btn_browse_adb.setFixedWidth(75)
+        btn_browse_adb.setStyleSheet("padding: 4px 8px; min-width: 50px;")
         btn_browse_adb.clicked.connect(self.browse_adb)
         adb_layout = QHBoxLayout()
         adb_layout.addWidget(self.adb_edit)
@@ -380,6 +382,8 @@ class SettingsDialog(QDialog):
         self.scrcpy_edit = QLineEdit(self.config.get('scrcpy_path', ''))
         btn_browse_scrcpy = QPushButton("찾기")
         btn_browse_scrcpy.setMinimumHeight(32)
+        btn_browse_scrcpy.setFixedWidth(75)
+        btn_browse_scrcpy.setStyleSheet("padding: 4px 8px; min-width: 50px;")
         btn_browse_scrcpy.clicked.connect(self.browse_scrcpy)
         scrcpy_layout = QHBoxLayout()
         scrcpy_layout.addWidget(self.scrcpy_edit)
@@ -527,9 +531,9 @@ class SettingsDialog(QDialog):
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 6px;
                 color: #e5e7eb;
-                padding: 8px 16px;
+                padding: 8px 12px;
                 font-size: 12px;
-                min-width: 80px;
+                min-width: 100px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.1);
