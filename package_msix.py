@@ -49,13 +49,13 @@ def write_manifest(manifest_path, version):
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
          IgnorableNamespaces="uap rescap">
-  <Identity Name="dev0.wombat.DroidDevHelper"
-            Publisher="CN=dev0.wombat"
+  <Identity Name="dev.wombat.DroidDevHelper"
+            Publisher="CN=dev.wombat"
             Version="{quad_version}"
             ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Droid Dev Helper</DisplayName>
-    <PublisherDisplayName>dev0.wombat</PublisherDisplayName>
+    <PublisherDisplayName>dev.wombat</PublisherDisplayName>
     <Logo>Assets\\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
