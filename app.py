@@ -345,21 +345,31 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config = config.copy()
         self.setWindowTitle("환경 설정")
-        self.resize(540, 480)
+        self.resize(560, 520)
         self.setup_ui()
         self.apply_style()
 
     def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
         
-        form_layout = QFormLayout()
-        form_layout.setSpacing(10)
+        # Scroll Area for high DPI compatibility
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setStyleSheet("background-color: transparent;")
+        
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background-color: transparent;")
+        form_layout = QFormLayout(scroll_content)
+        form_layout.setContentsMargins(10, 10, 10, 10)
+        form_layout.setSpacing(12)
         
         # ADB Path
         self.adb_edit = QLineEdit(self.config.get('adb_path', ''))
         btn_browse_adb = QPushButton("찾기")
+        btn_browse_adb.setMinimumHeight(32)
         btn_browse_adb.clicked.connect(self.browse_adb)
         adb_layout = QHBoxLayout()
         adb_layout.addWidget(self.adb_edit)
@@ -369,6 +379,7 @@ class SettingsDialog(QDialog):
         # Scrcpy Path
         self.scrcpy_edit = QLineEdit(self.config.get('scrcpy_path', ''))
         btn_browse_scrcpy = QPushButton("찾기")
+        btn_browse_scrcpy.setMinimumHeight(32)
         btn_browse_scrcpy.clicked.connect(self.browse_scrcpy)
         scrcpy_layout = QHBoxLayout()
         scrcpy_layout.addWidget(self.scrcpy_edit)
@@ -412,7 +423,7 @@ class SettingsDialog(QDialog):
 
         # Checkboxes Layout
         cb_grid = QGridLayout()
-        cb_grid.setSpacing(10)
+        cb_grid.setSpacing(12)
         
         self.cb_awake = QCheckBox("화면 켜짐 유지")
         self.cb_awake.setChecked(self.config.get('stay_awake', True))
@@ -432,13 +443,26 @@ class SettingsDialog(QDialog):
         cb_grid.addWidget(self.cb_read_only, 1, 1)
         
         form_layout.addRow("", cb_grid)
-        layout.addLayout(form_layout)
+        
+        scroll.setWidget(scroll_content)
+        main_layout.addWidget(scroll)
 
         # Button Box
         button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept_settings)
         button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        
+        # Enlarge button height for better Windows display
+        btn_save = button_box.button(QDialogButtonBox.Save)
+        if btn_save:
+            btn_save.setMinimumHeight(36)
+            btn_save.setText("저장")
+        btn_cancel = button_box.button(QDialogButtonBox.Cancel)
+        if btn_cancel:
+            btn_cancel.setMinimumHeight(36)
+            btn_cancel.setText("취소")
+            
+        main_layout.addWidget(button_box)
 
     def browse_adb(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "ADB 실행 파일 선택", "", "All Files (*)")
@@ -503,8 +527,9 @@ class SettingsDialog(QDialog):
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 6px;
                 color: #e5e7eb;
-                padding: 6px 12px;
+                padding: 8px 16px;
                 font-size: 12px;
+                min-width: 80px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.1);
