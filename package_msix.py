@@ -49,12 +49,12 @@ def write_manifest(manifest_path, version):
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
          IgnorableNamespaces="uap rescap">
-  <Identity Name="dev.wombat.DroidDevHelper"
-            Publisher="CN=dev.wombat"
+  <Identity Name="dev.wombat.DroidHelper"
+            Publisher="CN=A45D67D6-702F-427F-A0BF-48E664792AFA"
             Version="{quad_version}"
             ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Droid Dev Helper</DisplayName>
+    <DisplayName>Droid Helper</DisplayName>
     <PublisherDisplayName>dev.wombat</PublisherDisplayName>
     <Logo>Assets\\StoreLogo.png</Logo>
   </Properties>
@@ -69,7 +69,7 @@ def write_manifest(manifest_path, version):
     <Application Id="App"
                  Executable="droid-dev-helper.exe"
                  EntryPoint="Windows.FullTrustApplication">
-      <uap:VisualElements DisplayName="Droid Dev Helper"
+      <uap:VisualElements DisplayName="Droid Helper"
                           Description="Android Developer Helper Tool utilizing ADB and Scrcpy."
                           BackgroundColor="#0f172a"
                           Square150x150Logo="Assets\\Square150x150Logo.png"
