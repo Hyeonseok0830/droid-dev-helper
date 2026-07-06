@@ -802,7 +802,7 @@ class MainWindow(QMainWindow):
         
         btn_settings = QPushButton('설정 ⚙')
         btn_settings.setObjectName('btn-settings')
-        btn_settings.setFixedWidth(65)
+        btn_settings.setFixedWidth(78)
         btn_settings.clicked.connect(self.open_settings)
         
         logo_layout.addWidget(logo_label)
@@ -1878,6 +1878,7 @@ class MainWindow(QMainWindow):
                 background-color: rgba(99, 102, 241, 0.1);
                 border: 1px solid rgba(99, 102, 241, 0.25);
                 color: #a5b4fc;
+                padding: 6px 8px;
             }
             QPushButton#btn-settings:hover {
                 background-color: rgba(99, 102, 241, 0.2);
