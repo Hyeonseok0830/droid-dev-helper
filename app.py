@@ -291,9 +291,14 @@ class ScrcpyThread(QThread):
             args.append('--read-only')
             
         try:
+            creationflags = 0
+            if os.name == 'nt':
+                creationflags = 0x08000000 # CREATE_NO_WINDOW
+                
             self.process = subprocess.Popen(
                 args,
-                env=env
+                env=env,
+                creationflags=creationflags
             )
             code = self.process.wait()
             self.finished_signal.emit(code)
