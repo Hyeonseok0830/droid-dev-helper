@@ -45,6 +45,80 @@ def exception_hook(exctype, value, tb):
 
 sys.excepthook = exception_hook
 
+# 윈도우 환경에서 콘솔 창(cmd)이 뜨는 것을 완벽하게 숨기는 subprocess 래퍼 함수
+def safe_subprocess_run(args, **kwargs):
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0 # SW_HIDE
+        kwargs['startupinfo'] = startupinfo
+    return subprocess.run(args, **kwargs)
+
+def safe_subprocess_popen(args, **kwargs):
+    if os.name == 'nt':
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0 # SW_HIDE
+        kwargs['startupinfo'] = startupinfo
+    return subprocess.Popen(args, **kwargs)
+
+# 백그라운드 디바이스 실시간 감지 스레드 (메인 GUI 프리징 방지)
+class DeviceDetectThread(QThread):
+    devices_signal = pyqtSignal(dict)
+    error_signal = pyqtSignal(str)
+
+    def __init__(self, adb_path):
+        super().__init__()
+        self.adb_path = adb_path
+        self.running = True
+
+    def run(self):
+        while self.running:
+            if not self.adb_path:
+                self.msleep(1000)
+                continue
+            try:
+                # 5초 타임아웃, 윈도우 콘솔 숨김 처리 적용
+                res = safe_subprocess_run(
+                    [self.adb_path, 'devices', '-l'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=5.0
+                )
+                if res.returncode == 0:
+                    lines = res.stdout.strip().split('\n')[1:]
+                    current_devices = {}
+                    for line in lines:
+                        if not line.strip():
+                            continue
+                        tokens = line.split()
+                        if len(tokens) >= 2 and tokens[1] == 'device':
+                            serial = tokens[0]
+                            model = serial
+                            for token in tokens[2:]:
+                                if token.startswith('model:'):
+                                    model = token.split(':')[1]
+                                    break
+                            current_devices[serial] = model
+                    if self.running:
+                        self.devices_signal.emit(current_devices)
+                else:
+                    if self.running:
+                        self.error_signal.emit(res.stderr or "adb command error")
+            except subprocess.TimeoutExpired:
+                if self.running:
+                    self.error_signal.emit("Timeout")
+            except Exception as e:
+                if self.running:
+                    self.error_signal.emit(str(e))
+            
+            # 2.5초마다 체크
+            self.msleep(2500)
+
+    def stop(self):
+        self.running = False
+
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
 
 # 1. Tool Path Auto-Detection Utility
@@ -138,7 +212,7 @@ class LogcatThread(QThread):
         if self.serial:
             clear_cmd.extend(['-s', self.serial])
         clear_cmd.extend(['logcat', '-c'])
-        subprocess.run(clear_cmd)
+        safe_subprocess_run(clear_cmd)
         
         # Spawn logcat process
         cmd = [self.adb_path]
@@ -147,7 +221,7 @@ class LogcatThread(QThread):
         cmd.extend(['logcat', '-v', 'threadtime'])
         
         try:
-            self.process = subprocess.Popen(
+            self.process = safe_subprocess_popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -217,7 +291,7 @@ class ScrcpyThread(QThread):
             args.append('--read-only')
             
         try:
-            self.process = subprocess.Popen(
+            self.process = safe_subprocess_popen(
                 args,
                 env=env
             )
@@ -244,7 +318,7 @@ class AdbTaskThread(QThread):
 
     def run(self):
         try:
-            res = subprocess.run(
+            res = safe_subprocess_run(
                 self.command_args, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE, 
@@ -659,11 +733,11 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.apply_dark_style()
         
-        # Periodic check for device connections (every 2.5 seconds)
-        self.check_device_connection()
-        self.device_timer = QTimer(self)
-        self.device_timer.timeout.connect(self.check_device_connection)
-        self.device_timer.start(2500)
+        # Periodic check for device connections via background thread
+        self.device_detect_thread = DeviceDetectThread(self.adb_path)
+        self.device_detect_thread.devices_signal.connect(self.on_devices_detected)
+        self.device_detect_thread.error_signal.connect(self.on_device_detect_error)
+        self.device_detect_thread.start()
 
     def setup_ui(self):
         central_widget = QWidget(self)
@@ -989,79 +1063,62 @@ class MainWindow(QMainWindow):
             self.adb_path = self.config.get('adb_path', '')
             self.scrcpy_path = self.config.get('scrcpy_path', '')
             
+            # Update background thread's adb path
+            if hasattr(self, 'device_detect_thread'):
+                self.device_detect_thread.adb_path = self.adb_path
+            
             # Restart logcat with new settings if device is selected
             self.on_device_selection_changed()
             self.statusBar().showMessage('설정이 저장 및 적용되었습니다.', 3000)
 
-    # 8. Device Detection & Selection
-    def check_device_connection(self):
-        if not self.adb_path:
-            self.status_label.setText('ADB 경로 미지정 (설정 확인)')
-            self.status_label.setStyleSheet('color: #ff9f0a; background: rgba(255, 159, 10, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
-            self.enable_controls(False)
+    # 8. Device Detection & Selection (Slots from Background Thread)
+    def on_devices_detected(self, current_devices):
+        # Avoid rebuilding drop-down if connected device set has not changed
+        if set(current_devices.keys()) == self.connected_serials:
             return
 
-        try:
-            res = subprocess.run([self.adb_path, 'devices', '-l'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5.0)
-            lines = res.stdout.strip().split('\n')[1:]
+        self.connected_serials = set(current_devices.keys())
+        prev_selected = self.get_selected_device_serial()
+        
+        # Rebuild combobox
+        self.device_combo.clear()
+        
+        if current_devices:
+            for serial, model in current_devices.items():
+                self.device_combo.addItem(f"{model} ({serial})", serial)
             
-            current_devices = {}
-            for line in lines:
-                if not line.strip():
-                    continue
-                tokens = line.split()
-                if len(tokens) >= 2 and tokens[1] == 'device':
-                    serial = tokens[0]
-                    model = serial
-                    for token in tokens[2:]:
-                        if token.startswith('model:'):
-                            model = token.split(':')[1]
-                            break
-                    current_devices[serial] = model
-
-            # Avoid rebuilding drop-down if connected device set has not changed
-            if set(current_devices.keys()) == self.connected_serials:
-                return
-
-            self.connected_serials = set(current_devices.keys())
-            prev_selected = self.get_selected_device_serial()
-            
-            # Rebuild combobox
-            self.device_combo.clear()
-            
-            if current_devices:
-                for serial, model in current_devices.items():
-                    self.device_combo.addItem(f"{model} ({serial})", serial)
-                
-                # Restore previous selection if it's still connected
-                index = self.device_combo.findData(prev_selected)
-                if index >= 0:
-                    self.device_combo.setCurrentIndex(index)
-                else:
-                    self.device_combo.setCurrentIndex(0)
-                
-                device_count = len(current_devices)
-                self.status_label.setText(f'연결됨 ({device_count}개 장치)')
-                self.status_label.setStyleSheet('color: #34c759; background: rgba(52, 199, 89, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
-                self.enable_controls(True)
+            # Restore previous selection if it's still connected
+            index = self.device_combo.findData(prev_selected)
+            if index >= 0:
+                self.device_combo.setCurrentIndex(index)
             else:
-                self.status_label.setText('연결된 장치 없음')
-                self.status_label.setStyleSheet('color: #ff3b30; background: rgba(255, 59, 48, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
-                self.info_label.setText("디바이스 정보 없음")
-                self.enable_controls(False)
-                self.stop_logcat_stream()
-                
-        except subprocess.TimeoutExpired:
+                self.device_combo.setCurrentIndex(0)
+            
+            device_count = len(current_devices)
+            self.status_label.setText(f'연결됨 ({device_count}개 장치)')
+            self.status_label.setStyleSheet('color: #34c759; background: rgba(52, 199, 89, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
+            self.enable_controls(True)
+        else:
+            self.status_label.setText('연결된 장치 없음')
+            self.status_label.setStyleSheet('color: #ff3b30; background: rgba(255, 59, 48, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
+            self.info_label.setText("디바이스 정보 없음")
+            self.enable_controls(False)
+            self.stop_logcat_stream()
+
+    def on_device_detect_error(self, err_msg):
+        if err_msg == "Timeout":
             self.status_label.setText('연결 대기 중 (시간 초과)')
             self.status_label.setStyleSheet('color: #ff9f0a; background: rgba(255, 159, 10, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
             self.statusBar().showMessage("디바이스 연결 응답 시간 초과 (5초)", 3000)
-            self.enable_controls(False)
-            self.stop_logcat_stream()
-        except Exception as e:
+        else:
             self.status_label.setText('오류 발생')
-            self.statusBar().showMessage(f"디바이스 상태 확인 오류: {str(e)}", 3000)
-            self.enable_controls(False)
-            self.stop_logcat_stream()
+            self.statusBar().showMessage(f"디바이스 상태 확인 오류: {err_msg}", 3000)
+            
+        self.connected_serials.clear()
+        self.device_combo.clear()
+        self.enable_controls(False)
+        self.stop_logcat_stream()
+        self.info_label.setText("디바이스 정보 없음")
 
     def get_selected_device_serial(self):
         index = self.device_combo.currentIndex()
@@ -1099,10 +1156,10 @@ class MainWindow(QMainWindow):
                 
             def run(self):
                 try:
-                    brand = subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.product.brand'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip().upper()
-                    model = subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.product.model'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
-                    version = subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.build.version.release'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
-                    res_out = subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'wm', 'size'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
+                    brand = safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.product.brand'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip().upper()
+                    model = safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.product.model'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
+                    version = safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'getprop', 'ro.build.version.release'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
+                    res_out = safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'wm', 'size'], stdout=subprocess.PIPE, text=True, timeout=0.8).stdout.strip()
                     resolution = res_out.split(':')[-1].strip() if res_out else "알 수 없음"
                     
                     details = f"제조사/모델: {brand} {model}\nOS 버전: Android {version}\n화면 해상도: {resolution}"
@@ -1119,14 +1176,14 @@ class MainWindow(QMainWindow):
         if not serial: return
         try:
             # Check Layout Bounds (debug.layout)
-            res = subprocess.run([self.adb_path, '-s', serial, 'shell', 'getprop', 'debug.layout'], stdout=subprocess.PIPE, text=True, timeout=0.8)
+            res = safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'getprop', 'debug.layout'], stdout=subprocess.PIPE, text=True, timeout=0.8)
             layout_state = res.stdout.strip()
             self.layout_bounds_enabled = (layout_state == 'true')
             self.btn_layout.setText('레이아웃 경계 표시 끄기' if self.layout_bounds_enabled else '레이아웃 경계 표시 켜기')
             self.btn_layout.setStyleSheet('border-left: 4px solid #34c759; font-weight: bold;' if self.layout_bounds_enabled else '')
 
             # Check Show Touches (show_touches settings)
-            res = subprocess.run([self.adb_path, '-s', serial, 'shell', 'settings', 'get', 'system', 'show_touches'], stdout=subprocess.PIPE, text=True, timeout=0.8)
+            res = safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'settings', 'get', 'system', 'show_touches'], stdout=subprocess.PIPE, text=True, timeout=0.8)
             touches_state = res.stdout.strip()
             self.show_touches_enabled = (touches_state == '1')
             self.btn_touches.setText('터치 피드백 표기 끄기' if self.show_touches_enabled else '터치 피드백 표기 켜기')
@@ -1217,12 +1274,12 @@ class MainWindow(QMainWindow):
         serial = self.get_selected_device_serial()
         if not serial: return
         try:
-            res = subprocess.run([self.adb_path, '-s', serial, 'shell', 'getprop', 'debug.layout'], stdout=subprocess.PIPE, text=True)
+            res = safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'getprop', 'debug.layout'], stdout=subprocess.PIPE, text=True)
             current = res.stdout.strip()
             next_state = 'false' if current == 'true' else 'true'
             
-            subprocess.run([self.adb_path, '-s', serial, 'shell', 'setprop', 'debug.layout', next_state])
-            subprocess.run([self.adb_path, '-s', serial, 'shell', 'service', 'call', 'activity', '1599295570'])
+            safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'setprop', 'debug.layout', next_state])
+            safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'service', 'call', 'activity', '1599295570'])
             
             self.layout_bounds_enabled = (next_state == 'true')
             self.btn_layout.setText('레이아웃 경계 표시 끄기' if self.layout_bounds_enabled else '레이아웃 경계 표시 켜기')
@@ -1235,11 +1292,11 @@ class MainWindow(QMainWindow):
         serial = self.get_selected_device_serial()
         if not serial: return
         try:
-            res = subprocess.run([self.adb_path, '-s', serial, 'shell', 'settings', 'get', 'system', 'show_touches'], stdout=subprocess.PIPE, text=True)
+            res = safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'settings', 'get', 'system', 'show_touches'], stdout=subprocess.PIPE, text=True)
             current = res.stdout.strip()
             next_state = '0' if current == '1' else '1'
             
-            subprocess.run([self.adb_path, '-s', serial, 'shell', 'settings', 'put', 'system', 'show_touches', next_state])
+            safe_subprocess_run([self.adb_path, '-s', serial, 'shell', 'settings', 'put', 'system', 'show_touches', next_state])
             
             self.show_touches_enabled = (next_state == '1')
             self.btn_touches.setText('터치 피드백 표기 끄기' if self.show_touches_enabled else '터치 피드백 표기 켜기')
@@ -1251,7 +1308,7 @@ class MainWindow(QMainWindow):
     def send_keyevent(self, code):
         serial = self.get_selected_device_serial()
         if not serial: return
-        subprocess.Popen([self.adb_path, '-s', serial, 'shell', 'input', 'keyevent', str(code)])
+        safe_subprocess_popen([self.adb_path, '-s', serial, 'shell', 'input', 'keyevent', str(code)])
 
     def send_input_text(self):
         serial = self.get_selected_device_serial()
@@ -1264,14 +1321,14 @@ class MainWindow(QMainWindow):
         # Standard filter to avoid symbols breaking the bash syntax
         sanitized = ''.join(c for c in sanitized if c.isalnum() or c in '._-%$')
         
-        subprocess.Popen([self.adb_path, '-s', serial, 'shell', 'input', 'text', sanitized])
+        safe_subprocess_popen([self.adb_path, '-s', serial, 'shell', 'input', 'text', sanitized])
         self.input_edit.clear()
 
     def open_developer_options(self):
         serial = self.get_selected_device_serial()
         if not serial: return
         try:
-            subprocess.Popen([self.adb_path, '-s', serial, 'shell', 'am', 'start', '-a', 'android.settings.APPLICATION_DEVELOPMENT_SETTINGS'])
+            safe_subprocess_popen([self.adb_path, '-s', serial, 'shell', 'am', 'start', '-a', 'android.settings.APPLICATION_DEVELOPMENT_SETTINGS'])
             self.statusBar().showMessage('개발자 옵션 설정 화면 진입', 2000)
         except Exception as e:
             QMessageBox.critical(self, '오류', f'명령어 실패: {str(e)}')
@@ -1338,17 +1395,17 @@ class MainWindow(QMainWindow):
                 def run(self):
                     try:
                         # 1. Capture screen on android
-                        res1 = subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'screencap', '-p', self.device_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        res1 = safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'screencap', '-p', self.device_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                         if res1.returncode != 0:
                             self.finished_signal.emit(False, f"안드로이드 캡처 실패: {res1.stderr.decode('utf-8', errors='ignore')}")
                             return
                         # 2. Pull down to PC local path
-                        res2 = subprocess.run([self.adb_path, '-s', self.serial, 'pull', self.device_path, self.local_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        res2 = safe_subprocess_run([self.adb_path, '-s', self.serial, 'pull', self.device_path, self.local_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                         if res2.returncode != 0:
                             self.finished_signal.emit(False, f"파일 가져오기 실패: {res2.stderr.decode('utf-8', errors='ignore')}")
                             return
                         # 3. Clean up android storage
-                        subprocess.run([self.adb_path, '-s', self.serial, 'shell', 'rm', self.device_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        safe_subprocess_run([self.adb_path, '-s', self.serial, 'shell', 'rm', self.device_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                         
                         self.finished_signal.emit(True, self.local_path)
                     except Exception as e:
