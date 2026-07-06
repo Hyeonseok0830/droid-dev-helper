@@ -801,7 +801,7 @@ class MainWindow(QMainWindow):
         device_layout.addWidget(self.info_label)
         
         btn_refresh = QPushButton('연결 강제 확인')
-        btn_refresh.clicked.connect(self.check_device_connection)
+        btn_refresh.clicked.connect(self.force_check_device_connection)
         device_layout.addWidget(btn_refresh)
         
         sidebar_layout.addWidget(device_box)
@@ -1119,6 +1119,43 @@ class MainWindow(QMainWindow):
         self.enable_controls(False)
         self.stop_logcat_stream()
         self.info_label.setText("디바이스 정보 없음")
+
+    def force_check_device_connection(self):
+        if not self.adb_path:
+            self.status_label.setText('ADB 경로 미지정 (설정 확인)')
+            self.status_label.setStyleSheet('color: #ff9f0a; background: rgba(255, 159, 10, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
+            self.enable_controls(False)
+            return
+            
+        self.status_label.setText('기기 감지 중...')
+        self.status_label.setStyleSheet('color: #a78bfa; background: rgba(167, 139, 250, 0.1); padding: 6px 12px; border-radius: 8px; font-weight: bold;')
+        
+        # Query devices asynchronously using AdbTaskThread to prevent UI freeze
+        self.refresh_task = AdbTaskThread([self.adb_path, 'devices', '-l'])
+        
+        def on_refresh_finished(success, output):
+            if success:
+                lines = output.strip().split('\n')[1:]
+                current_devices = {}
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    tokens = line.split()
+                    if len(tokens) >= 2 and tokens[1] == 'device':
+                        serial = tokens[0]
+                        model = serial
+                        for token in tokens[2:]:
+                            if token.startswith('model:'):
+                                model = token.split(':')[1]
+                                break
+                        current_devices[serial] = model
+                self.on_devices_detected(current_devices)
+            else:
+                self.on_device_detect_error(output)
+                
+        self.refresh_task.finished_signal.connect(on_refresh_finished)
+        self.active_tasks.append(self.refresh_task)
+        self.refresh_task.start()
 
     def get_selected_device_serial(self):
         index = self.device_combo.currentIndex()
