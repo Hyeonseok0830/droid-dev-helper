@@ -1,0 +1,31 @@
+name: droid-helper
+base: core22
+version: '1.0.0'
+summary: Android Developer Helper Tool utilizing ADB and Scrcpy
+description: |
+  Droid Dev Helper is a smart companion GUI application for Android developers.
+  It helps you mirror screens, capture screenshots, view real-time logcats, and send hardware inputs easily.
+grade: stable
+confinement: strict
+
+apps:
+  droid-helper:
+    command: usr/bin/droid-dev-helper
+    desktop: usr/share/applications/droid-dev-helper.desktop
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - network-bind
+      - raw-usb
+
+parts:
+  droid-dev-helper:
+    plugin: dump
+    source: dist/
+    organize:
+      droid-dev-helper: usr/bin/droid-dev-helper
+    stage-packages:
+      - libx11-6
+      - libgl1
+      - libegl1

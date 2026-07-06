@@ -129,6 +129,18 @@ jobs:
           
           mv Droid_Dev_Helper*.AppImage dist/Droid-Dev-Helper_${TAG_VERSION}_amd64.AppImage
 
+      # --- Build Snap Package for Ubuntu App Center ---
+      - name: Build Snap Package
+        if: matrix.os == 'ubuntu-latest'
+        uses: snapcore/action-build@v1
+        id: snapcraft
+        
+      - name: Move Snap to dist
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p dist
+          mv *.snap dist/ || true
+
       # --- macOS Specific Packaging (.dmg) ---
       - name: Package macOS Assets
         if: matrix.os == 'macos-latest'
@@ -196,6 +208,7 @@ jobs:
             dist/*.deb
             dist/*.AppImage
             dist/*.tar.gz
+            dist/*.snap
             dist/*.dmg
             dist/*.zip
             dist/*.exe
