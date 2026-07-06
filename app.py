@@ -291,7 +291,7 @@ class ScrcpyThread(QThread):
             args.append('--read-only')
             
         try:
-            self.process = safe_subprocess_popen(
+            self.process = subprocess.Popen(
                 args,
                 env=env
             )
