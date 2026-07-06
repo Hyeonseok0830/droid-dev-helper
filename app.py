@@ -340,7 +340,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config = config.copy()
         self.setWindowTitle("환경 설정")
-        self.resize(480, 420)
+        self.resize(540, 480)
         self.setup_ui()
         self.apply_style()
 
@@ -1970,9 +1970,26 @@ class MainWindow(QMainWindow):
         event.accept()
 
 if __name__ == '__main__':
+    # High DPI scaling 활성화 (화면 해상도 배율 대응)
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QFont
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    
     app = QApplication(sys.argv)
-    app.setApplicationName("AndroidDevCompanion")
-    app.setDesktopFileName("AndroidDevCompanion.desktop")
+    app.setApplicationName("DroidDevHelper")
+    app.setDesktopFileName("droid-dev-helper.desktop")
+    
+    # 윈도우/맥/리눅스 환경에서 가독성이 높고 미려한 기본 고딕 폰트 적용
+    font = QFont('Malgun Gothic', 9)
+    if not font.exactMatch():
+        font = QFont('Apple SD Gothic Neo', 9)
+        if not font.exactMatch():
+            font = QFont('Noto Sans CJK KR', 9)
+            if not font.exactMatch():
+                font.setFamily('sans-serif')
+    app.setFont(font)
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
