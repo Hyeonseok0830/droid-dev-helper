@@ -151,7 +151,7 @@ jobs:
             "droid-dev-helper-${TAG_VERSION}-universal.dmg" \
             "droid-dev-helper.app"
 
-      # --- Windows Specific Packaging (Setup.exe) ---
+      # --- Windows Specific Packaging (Setup.exe & MSIX) ---
       - name: Package Windows Assets
         if: matrix.os == 'windows-latest'
         shell: bash
@@ -183,6 +183,9 @@ jobs:
           
           # Run Inno Setup Compiler (iscc is pre-installed on Windows runner)
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+          
+          # Package MSIX
+          python package_msix.py ${TAG_VERSION}
 
       # --- Upload Intermediate Artifacts for Release Job ---
       - name: Upload Build Artifacts
@@ -196,6 +199,7 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/*.exe
+            dist/*.msix
           if-no-files-found: error
 
   release:
